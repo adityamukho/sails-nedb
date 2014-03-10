@@ -103,7 +103,7 @@ module.exports = (function () {
         var keys = Object.keys(def);
 
         // Loop through the def and process attributes for each key
-        async.errach(keys, processKey, function (err) {
+        async.each(keys, processKey, function (err) {
           if (err) return cb(err);
           modelReferences[collectionName].schema = def;
           cb(null, modelReferences[collectionName].schema);
@@ -138,8 +138,12 @@ module.exports = (function () {
      * @return {[type]}                  [description]
      */
     drop: function (collectionName, relations, cb) {
-      delete dbs[collectionName];
-      fs.unlink(path.join(this.config.filePath, collectionName + '.nedb'), cb);
+      dbs[collectionName].db.remove({}, {
+        multi: true
+      }, function (err, numRemoved) {
+        delete dbs[collectionName];
+        fs.unlink(path.join(this.config.filePath, collectionName + '.nedb'), cb);
+      });
     },
 
     // OVERRIDES NOT CURRENTLY FULLY SUPPORTED FOR:
@@ -188,9 +192,8 @@ module.exports = (function () {
 
       if (!useCursor) {
         dbs[collectionName].queue.push(payload, cb);
-      }
-      else {
-        dbs[collectionName].queue.push(payload, function(cursor) {
+      } else {
+        dbs[collectionName].queue.push(payload, function (cursor) {
           if (options.sort) {
             cursor = cursor.sort(options.sort);
           }

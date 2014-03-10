@@ -23,7 +23,9 @@
   "license": "MIT",
   "readmeFilename": "README.md",
   "dependencies": {
-    "nedb": "^0.10.4"
+    "nedb": "https://github.com/adityamukho/nedb/tarball/v0.10.4g",
+    "async": "^0.2.10",
+    "lodash": "^2.4.1"
   },
   "devDependencies": {
     "waterline-adapter-tests": "git://github.com/balderdashy/waterline-adapter-tests.git#associations",
