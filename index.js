@@ -13,10 +13,10 @@ module.exports = (function () {
     schemaStash = {};
 
   var adapter = {
-    syncable: false,
+    syncable: true,
     defaults: {
+      schema: false,
       filePath: '.tmp',
-      migrate: 'alter'
     },
 
     /**
@@ -57,57 +57,46 @@ module.exports = (function () {
      * @return {[type]}                  [description]
      */
     define: function (collectionName, definition, cb) {
-      dbs[collectionName] = {
-        // Access db ops through a queue to avoid callstack overflows under heavy loads
-        queue: async.queue(function (payload, done, cursor) {
-          var db = dbs[collectionName].db;
-          if (!cursor) {
-            payload.args.push(done);
-            db[payload.query].apply(db, payload.args);
-          } else {
-            done(db[payload.query].apply(db, payload.args));
+      dbs[collectionName] = new Datastore({
+        filename: path.join(this.config.filePath, collectionName + '.nedb'),
+        autoload: true,
+        onload: function (err) {
+          if (err) {
+            return cb(err);
           }
-        }, 1),
-        db: new Datastore({
-          filename: path.join(this.config.filePath, collectionName + '.nedb');
-        })
-      };
-      dbs[collectionName].db.loadDatabase(function (err) {
-        if (err) {
-          return cb(err);
+
+          var self = this,
+            def = _.clone(definition);
+
+          function processKey(key, cb) {
+            if (def[key].autoIncrement) {
+              delete def[key].autoIncrement;
+            }
+
+            if (def[key].unique || def[key].index) {
+              return self.ensureIndex({
+                fieldName: key,
+                sparse: true,
+                unique: def[key].unique
+              }, function (err) {
+                if (err) return cb(err);
+                def[key].indexed = true;
+                cb();
+              });
+            }
+
+            cb();
+          }
+
+          var keys = _.keys(def);
+
+          // Loop through the def and process attributes for each key
+          async.each(keys, processKey, function (err) {
+            if (err) return cb(err);
+            modelReferences[collectionName].schema = def;
+            cb(null, modelReferences[collectionName].schema);
+          });
         }
-
-        // Clone the definition
-        var def = _.clone(definition);
-
-        function processKey(key, cb) {
-          if (def[key].autoIncrement) {
-            delete def[key].autoIncrement;
-          }
-
-          if (def[key].unique || def[key].index) {
-            return dbs[collectionName].db.ensureIndex({
-              fieldName: key,
-              sparse: true,
-              unique: def[key].unique
-            }, function (err) {
-              if (err) return cb(err);
-              def[key].indexed = true;
-              cb();
-            });
-          }
-
-          cb();
-        }
-
-        var keys = Object.keys(def);
-
-        // Loop through the def and process attributes for each key
-        async.each(keys, processKey, function (err) {
-          if (err) return cb(err);
-          modelReferences[collectionName].schema = def;
-          cb(null, modelReferences[collectionName].schema);
-        });
       });
     },
 
@@ -121,7 +110,8 @@ module.exports = (function () {
      * @return {[type]}                  [description]
      */
     describe: function (collectionName, cb) {
-      var des = Object.keys(modelReferences[collectionName].schema).length === 0 ?
+      console.dir(arguments);
+      var des = _.keys(modelReferences[collectionName].schema).length === 0 ?
         null : modelReferences[collectionName].schema;
       return cb(null, des);
     },
@@ -138,11 +128,14 @@ module.exports = (function () {
      * @return {[type]}                  [description]
      */
     drop: function (collectionName, relations, cb) {
-      dbs[collectionName].db.remove({}, {
+      var self = this;
+      dbs[collectionName].remove({}, {
         multi: true
       }, function (err, numRemoved) {
         delete dbs[collectionName];
-        fs.unlink(path.join(this.config.filePath, collectionName + '.nedb'), cb);
+        delete modelReferences[collectionName];
+        delete schemaStash[collectionName];
+        fs.unlink(self.filename, cb);
       });
     },
 
@@ -182,30 +175,96 @@ module.exports = (function () {
       // If no matches were found, this will be an empty array.
 
       // Respond with an error, or the results.
-      var payload = {
-        query: 'find',
-        args: [options.where]
-      },
-        useCursor = _.any(options, function (opt, key) {
-          return (key !== 'where') && !_.isEmpty(opt);
+
+      options = criteria.rewriteCriteria(options, schemaStash[collectionName]);
+
+      var cursor = dbs[collectionName].find(options.where),
+        groupVars = _(options).pick('groupBy', 'sum', 'average', 'min', 'max', function (el) {
+          return _.isArray(el);
         });
 
-      if (!useCursor) {
-        dbs[collectionName].queue.push(payload, cb);
-      } else {
-        dbs[collectionName].queue.push(payload, function (cursor) {
-          if (options.sort) {
-            cursor = cursor.sort(options.sort);
-          }
-          if (options.skip) {
-            cursor = cursor.sort(options.skip);
-          }
-          if (options.limit) {
-            cursor = cursor.sort(options.limit);
-          }
-          cursor.exec(cb);
-        }, true);
+      if (!groupVars.isEmpty()) {
+        if (groupVars.omit('groupBy').isEmpty()) {
+          return cb(new Error('Cannot groupBy without a calculation'));
+        }
+
+        var aggr = {
+          sum: [],
+          min: [],
+          max: []
+        },
+          seed = {
+            sum: 0,
+            min: Number.NaN,
+            max: Number.NaN
+          },
+          group = {
+            initial: {
+              count: {}
+            },
+            reduce: function (curr, result) {
+              aggr.sum.forEach(function (field) {
+                result[field] += curr[field];
+              });
+              aggr.min.forEach(function (field) {
+                //JS always returns false for (a < b) when b is NaN.
+                if ((curr[field] < result[field]) || _.isNaN(result[field])) {
+                  result[field] = curr[field];
+                }
+              });
+              aggr.max.forEach(function (field) {
+                //JS always returns false for (a > b) when b is NaN
+                if ((curr[field] > result[field]) || _.isNaN(result[field])) {
+                  result[field] = curr[field];
+                }
+              });
+              for (var field in result.count) {
+                result[field] += curr[field];
+                result.count[field]++;
+              }
+            },
+            finalize: function (result) {
+              for (var field in result.count) {
+                result[field] /= result.count[field];
+              }
+              delete result.count;
+            }
+          };
+
+        //Init group.key
+        if (groupVars.has('groupBy')) {
+          group.key = {};
+          options.groupBy.forEach(function (key) {
+            group.key[key] = 1;
+          });
+        }
+
+        //Init group.initial
+        groupVars.omit('groupBy').each(function (value, key) {
+          value.forEach(function (field) {
+            if (key === 'average') {
+              initial.count[field] = 0;
+              initial[field] = 0;
+            } else {
+              initial[field] = seed[key];
+              aggr[key].push(field);
+            }
+          });
+        });
       }
+      if (options.sort) {
+        //TODO: Handle sort
+      }
+      if (options.skip) {
+        cursor.skip(options.skip);
+      }
+      if (options.limit) {
+        cursor.skip(options.limit);
+      }
+
+      cursor.exec(function (err, docs) {
+        cb(err, utils.rewriteIds(docs));
+      });
     },
 
     /**
@@ -217,17 +276,15 @@ module.exports = (function () {
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    create: function (collectionName, values, cb) {
-      // If you need to access your private data for this collection:
-      var collection = _modelReferences[collectionName];
+    create: function (collectionName, data, cb) {
+      delete data.id;
+      delete data._id;
 
-      // Create a single new model (specified by `values`)
-
-      // Respond with error or the newly-created record.
-      cb(null, values);
+      dbs[collectionName].insert(data, function (err, result) {
+        if (err) return cb(err);
+        cb(err, result);
+      });
     },
-
-    // 
 
     /**
      *
@@ -284,90 +341,102 @@ module.exports = (function () {
     },
 
     /*
-    **********************************************
-    * Optional overrides
-    **********************************************
+        **********************************************
+        * Optional overrides
+        **********************************************
 
-    // Optional override of built-in batch create logic for increased efficiency
-    // (since most databases include optimizations for pooled queries, at least intra-connection)
-    // otherwise, Waterline core uses create()
-    createEach: function (collectionName, arrayOfObjects, cb) { cb(); },
+        // Optional override of built-in batch create logic for increased efficiency
+        // (since most databases include optimizations for pooled queries, at least intra-connection)
+        // otherwise, Waterline core uses create()
+        createEach: function (collectionName, arrayOfObjects, cb) { cb(); },
 
-    // Optional override of built-in findOrCreate logic for increased efficiency
-    // (since most databases include optimizations for pooled queries, at least intra-connection)
-    // otherwise, uses find() and create()
-    findOrCreate: function (collectionName, arrayOfAttributeNamesWeCareAbout, newAttributesObj, cb) { cb(); },
-    */
+        // Optional override of built-in findOrCreate logic for increased efficiency
+        // (since most databases include optimizations for pooled queries, at least intra-connection)
+        // otherwise, uses find() and create()
+        findOrCreate: function (collectionName, arrayOfAttributeNamesWeCareAbout, newAttributesObj, cb) { cb(); },
+      */
+
+    createEach: function (collectionName, data, cb) {
+      data.forEach(function (val) {
+        delete val.id;
+        delete val._id;
+      });
+
+      dbs[collectionName].insert(data, function (err, result) {
+        if (err) return cb(err);
+        cb(err, result);
+      });
+    },
 
     /*
-    **********************************************
-    * Custom methods
-    **********************************************
+        **********************************************
+        * Custom methods
+        **********************************************
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
-    //
-    // > NOTE:  There are a few gotchas here you should be aware of.
-    //
-    //    + The collectionName argument is always prepended as the first argument.
-    //      This is so you can know which model is requesting the adapter.
-    //
-    //    + All adapter functions are asynchronous, even the completely custom ones,
-    //      and they must always include a callback as the final argument.
-    //      The first argument of callbacks is always an error object.
-    //      For core CRUD methods, Waterline will add support for .done()/promise usage.
-    //
-    //    + The function signature for all CUSTOM adapter methods below must be:
-    //      `function (collectionName, options, cb) { ... }`
-    //
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-    // Custom methods defined here will be available on all models
-    // which are hooked up to this adapter:
-    //
-    // e.g.:
-    //
-    foo: function (collectionName, options, cb) {
-      return cb(null,"ok");
-    },
-    bar: function (collectionName, options, cb) {
-      if (!options.jello) return cb("Failure!");
-      else return cb();
-    }
-
-    // So if you have three models:
-    // Tiger, Sparrow, and User
-    // 2 of which (Tiger and Sparrow) implement this custom adapter,
-    // then you'll be able to access:
-    //
-    // Tiger.foo(...)
-    // Tiger.bar(...)
-    // Sparrow.foo(...)
-    // Sparrow.bar(...)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        //
+        // > NOTE:  There are a few gotchas here you should be aware of.
+        //
+        //    + The collectionName argument is always prepended as the first argument.
+        //      This is so you can know which model is requesting the adapter.
+        //
+        //    + All adapter functions are asynchronous, even the completely custom ones,
+        //      and they must always include a callback as the final argument.
+        //      The first argument of callbacks is always an error object.
+        //      For core CRUD methods, Waterline will add support for .done()/promise usage.
+        //
+        //    + The function signature for all CUSTOM adapter methods below must be:
+        //      `function (collectionName, options, cb) { ... }`
+        //
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    // Example success usage:
-    //
-    // (notice how the first argument goes away:)
-    Tiger.foo({}, function (err, result) {
-      if (err) return console.error(err);
-      else console.log(result);
+        // Custom methods defined here will be available on all models
+        // which are hooked up to this adapter:
+        //
+        // e.g.:
+        //
+        foo: function (collectionName, options, cb) {
+          return cb(null,"ok");
+        },
+        bar: function (collectionName, options, cb) {
+          if (!options.jello) return cb("Failure!");
+          else return cb();
+        }
 
-      // outputs: ok
-    });
-
-    // Example error usage:
-    //
-    // (notice how the first argument goes away:)
-    Sparrow.bar({test: 'yes'}, function (err, result){
-      if (err) console.error(err);
-      else console.log(result);
-
-      // outputs: Failure!
-    })
+        // So if you have three models:
+        // Tiger, Sparrow, and User
+        // 2 of which (Tiger and Sparrow) implement this custom adapter,
+        // then you'll be able to access:
+        //
+        // Tiger.foo(...)
+        // Tiger.bar(...)
+        // Sparrow.foo(...)
+        // Sparrow.bar(...)
 
 
-    
+        // Example success usage:
+        //
+        // (notice how the first argument goes away:)
+        Tiger.foo({}, function (err, result) {
+          if (err) return console.error(err);
+          else console.log(result);
+
+          // outputs: ok
+        });
+
+        // Example error usage:
+        //
+        // (notice how the first argument goes away:)
+        Sparrow.bar({test: 'yes'}, function (err, result){
+          if (err) console.error(err);
+          else console.log(result);
+
+          // outputs: Failure!
+        })
+
+
+        
 
     */
 

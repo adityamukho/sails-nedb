@@ -4,7 +4,8 @@
   "description": "NeDB adapter for Sails / Waterline",
   "main": "index.js",
   "scripts": {
-    "test": "node test/integration/runner -R spec -b"
+    "test": "node test/integration/runner -R spec -b",
+    "prepublish": "npm prune"
   },
   "repository": {
     "type": "git",
