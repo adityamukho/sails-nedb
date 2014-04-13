@@ -26,7 +26,10 @@
   "dependencies": {
     "nedb": "https://github.com/adityamukho/nedb/tarball/v0.10.4g",
     "async": "^0.2.10",
-    "lodash": "^2.4.1"
+    "lodash": "^2.4.1",
+    "base-framework": "^1.0.1",
+    "mkdirp": "^0.3.5",
+    "waterline-errors": "^0.10.0-rc1"
   },
   "devDependencies": {
     "waterline-adapter-tests": "git://github.com/balderdashy/waterline-adapter-tests.git#associations",

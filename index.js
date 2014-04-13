@@ -1,22 +1,33 @@
 /**
  * Module Dependencies
  */
-var async = require('async'),
-  _ = require('lodash'),
-  Datastore = require('nedb'),
-  path = require('path'),
-  fs = require('fs');
+var Connection = require('./lib/connection'),
+  Errors = require('waterline-errors').adapter;
 
 module.exports = (function () {
-  var modelReferences = {},
-    dbs = {},
-    schemaStash = {};
+  var connections = {};
 
   var adapter = {
+    identity: 'sails-nedb',
     syncable: true,
+    migrate: 'alter',
     defaults: {
       schema: false,
       filePath: '.tmp',
+    },
+
+    // Register A Connection
+    registerConnection: function (connection, collections, cb) {
+
+      if (!connection.identity) return cb(Errors.IdentityMissing);
+      if (connections[connection.identity]) return cb(Errors.IdentityDuplicate);
+
+      try {
+        connections[connection.identity] = new Connection(connection, collections);
+        cb();
+      } catch (err) {
+        cb(err);
+      }
     },
 
     /**
@@ -28,11 +39,11 @@ module.exports = (function () {
      * @param  {Function} cb         [description]
      * @return {[type]}              [description]
      */
-    registerCollection: function (collection, cb) {
-      modelReferences[collection.identity] = collection;
-      schemaStash[collection.identity] = collection.definition;
-      cb();
-    },
+    // registerCollection: function (collection, cb) {
+    //   modelReferences[collection.identity] = collection;
+    //   schemaStash[collection.identity] = collection.definition;
+    //   cb();
+    // },
 
     /**
      * Fired when a model is unregistered, typically when the server
@@ -42,79 +53,120 @@ module.exports = (function () {
      * @param  {Function} cb [description]
      * @return {[type]}      [description]
      */
-    teardown: function (cb) {
+    teardown: function (conn, cb) {
+      if (typeof conn == 'function') {
+        cb = conn;
+        conn = null;
+      }
+      if (conn == null) {
+        connections = {};
+        return cb();
+      }
+      if (!connections[conn]) return cb();
+      delete connections[conn];
       cb();
     },
+
+    describe: function (conn, coll, cb) {
+      grabConnection(conn).describe(coll, cb);
+    },
+
+    define: function (conn, coll, definition, cb) {
+      grabConnection(conn).createCollection(coll, definition, cb);
+    },
+
+    drop: function (conn, coll, relations, cb) {
+      grabConnection(conn).dropCollection(coll, relations, cb);
+    },
+
+    find: function (conn, coll, options, cb) {
+      grabConnection(conn).select(coll, options, cb);
+    },
+
+    create: function (conn, coll, values, cb) {
+      grabConnection(conn).insert(coll, values, cb);
+    },
+
+    update: function (conn, coll, options, values, cb) {
+      grabConnection(conn).update(coll, options, values, cb);
+    },
+
+    destroy: function (conn, coll, options, cb) {
+      grabConnection(conn).destroy(coll, options, cb);
+    }
 
     /**
      *
      * REQUIRED method if integrating with a schemaful
      * (SQL-ish) database.
      *
+     * @param  {[type]}   connName       [description]
      * @param  {[type]}   collectionName [description]
      * @param  {[type]}   definition     [description]
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    define: function (collectionName, definition, cb) {
-      dbs[collectionName] = new Datastore({
-        filename: path.join(this.config.filePath, collectionName + '.nedb'),
-        autoload: true,
-        onload: function (err) {
-          if (err) {
-            return cb(err);
-          }
+    // define: function (connName, collectionName, definition, cb) {
+    //   dbs[collectionName] = new Datastore({
+    //     filename: path.join(this.config.filePath, collectionName + '.nedb'),
+    //     autoload: true,
+    //     onload: function (err) {
+    //       if (err) {
+    //         return cb(err);
+    //       }
 
-          var self = this,
-            def = _.clone(definition);
+    //       var self = this,
+    //         def = _.clone(definition);
 
-          function processKey(key, cb) {
-            if (def[key].autoIncrement) {
-              delete def[key].autoIncrement;
-            }
+    //       function processKey(key, cb) {
+    //         if (def[key].autoIncrement) {
+    //           delete def[key].autoIncrement;
+    //         }
 
-            if (def[key].unique || def[key].index) {
-              return self.ensureIndex({
-                fieldName: key,
-                sparse: true,
-                unique: def[key].unique
-              }, function (err) {
-                if (err) return cb(err);
-                def[key].indexed = true;
-                cb();
-              });
-            }
+    //         if (def[key].unique || def[key].index) {
+    //           return self.ensureIndex({
+    //             fieldName: key,
+    //             sparse: true,
+    //             unique: def[key].unique
+    //           }, function (err) {
+    //             if (err) return cb(err);
+    //             def[key].indexed = true;
+    //             cb();
+    //           });
+    //         }
 
-            cb();
-          }
+    //         cb();
+    //       }
 
-          var keys = _.keys(def);
+    //       var keys = _.keys(def);
 
-          // Loop through the def and process attributes for each key
-          async.each(keys, processKey, function (err) {
-            if (err) return cb(err);
-            modelReferences[collectionName].schema = def;
-            cb(null, modelReferences[collectionName].schema);
-          });
-        }
-      });
-    },
+    //       // Loop through the def and process attributes for each key
+    //       async.each(keys, processKey, function (err) {
+    //         if (err) return cb(err);
+    //         modelReferences[collectionName].schema = def;
+    //         cb(null, modelReferences[collectionName].schema);
+    //       });
+    //     }
+    //   });
+    // },
 
     /**
      *
      * REQUIRED method if integrating with a schemaful
      * (SQL-ish) database.
      *
+     * @param  {[type]}   connName       [description]
      * @param  {[type]}   collectionName [description]
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    describe: function (collectionName, cb) {
-      console.dir(arguments);
-      var des = _.keys(modelReferences[collectionName].schema).length === 0 ?
-        null : modelReferences[collectionName].schema;
-      return cb(null, des);
-    },
+    // describe: function (connName, collectionName, cb) {
+    //   console.dir(arguments);
+    //   console.dir(modelReferences);
+    //   var des = _.keys(modelReferences[collectionName].schema).length === 0 ?
+    //     null : modelReferences[collectionName].schema;
+    //   return cb(null, des);
+    // },
 
     /**
      *
@@ -122,25 +174,26 @@ module.exports = (function () {
      * REQUIRED method if integrating with a schemaful
      * (SQL-ish) database.
      *
+     * @param  {[type]}   connName       [description]
      * @param  {[type]}   collectionName [description]
      * @param  {[type]}   relations      [description]
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    drop: function (collectionName, relations, cb) {
-      var self = this;
-      dbs[collectionName].remove({}, {
-        multi: true
-      }, function (err, numRemoved) {
-        delete dbs[collectionName];
-        delete modelReferences[collectionName];
-        delete schemaStash[collectionName];
-        fs.unlink(self.filename, cb);
-      });
-    },
+    // drop: function (connName, collectionName, relations, cb) {
+    //   var self = this;
+    //   dbs[collectionName].remove({}, {
+    //     multi: true
+    //   }, function (err, numRemoved) {
+    //     delete dbs[collectionName];
+    //     delete modelReferences[collectionName];
+    //     delete schemaStash[collectionName];
+    //     fs.unlink(self.filename, cb);
+    //   });
+    // },
 
     // OVERRIDES NOT CURRENTLY FULLY SUPPORTED FOR:
-    // 
+    //
     // alter: function (collectionName, changes, cb) {},
     // addAttribute: function(collectionName, attrName, attrDef, cb) {},
     // removeAttribute: function(collectionName, attrName, attrDef, cb) {},
@@ -162,110 +215,110 @@ module.exports = (function () {
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    find: function (collectionName, options, cb) {
-      // Options object is normalized for you:
-      // 
-      // options.where
-      // options.limit
-      // options.skip
-      // options.sort
+    // find: function (collectionName, options, cb) {
+    //   // Options object is normalized for you:
+    //   //
+    //   // options.where
+    //   // options.limit
+    //   // options.skip
+    //   // options.sort
 
-      // Filter, paginate, and sort records from the datastore.
-      // You should end up w/ an array of objects as a result.
-      // If no matches were found, this will be an empty array.
+    //   // Filter, paginate, and sort records from the datastore.
+    //   // You should end up w/ an array of objects as a result.
+    //   // If no matches were found, this will be an empty array.
 
-      // Respond with an error, or the results.
+    //   // Respond with an error, or the results.
 
-      options = criteria.rewriteCriteria(options, schemaStash[collectionName]);
+    //   options = criteria.rewriteCriteria(options, schemaStash[collectionName]);
 
-      var cursor = dbs[collectionName].find(options.where),
-        groupVars = _(options).pick('groupBy', 'sum', 'average', 'min', 'max', function (el) {
-          return _.isArray(el);
-        });
+    //   var cursor = dbs[collectionName].find(options.where),
+    //     groupVars = _(options).pick('groupBy', 'sum', 'average', 'min', 'max', function (el) {
+    //       return _.isArray(el);
+    //     });
 
-      if (!groupVars.isEmpty()) {
-        if (groupVars.omit('groupBy').isEmpty()) {
-          return cb(new Error('Cannot groupBy without a calculation'));
-        }
+    //   if (!groupVars.isEmpty()) {
+    //     if (groupVars.omit('groupBy').isEmpty()) {
+    //       return cb(new Error('Cannot groupBy without a calculation'));
+    //     }
 
-        var aggr = {
-          sum: [],
-          min: [],
-          max: []
-        },
-          seed = {
-            sum: 0,
-            min: Number.NaN,
-            max: Number.NaN
-          },
-          group = {
-            initial: {
-              count: {}
-            },
-            reduce: function (curr, result) {
-              aggr.sum.forEach(function (field) {
-                result[field] += curr[field];
-              });
-              aggr.min.forEach(function (field) {
-                //JS always returns false for (a < b) when b is NaN.
-                if ((curr[field] < result[field]) || _.isNaN(result[field])) {
-                  result[field] = curr[field];
-                }
-              });
-              aggr.max.forEach(function (field) {
-                //JS always returns false for (a > b) when b is NaN
-                if ((curr[field] > result[field]) || _.isNaN(result[field])) {
-                  result[field] = curr[field];
-                }
-              });
-              for (var field in result.count) {
-                result[field] += curr[field];
-                result.count[field]++;
-              }
-            },
-            finalize: function (result) {
-              for (var field in result.count) {
-                result[field] /= result.count[field];
-              }
-              delete result.count;
-            }
-          };
+    //     var aggr = {
+    //       sum: [],
+    //       min: [],
+    //       max: []
+    //     },
+    //       seed = {
+    //         sum: 0,
+    //         min: Number.NaN,
+    //         max: Number.NaN
+    //       },
+    //       group = {
+    //         initial: {
+    //           count: {}
+    //         },
+    //         reduce: function (curr, result) {
+    //           aggr.sum.forEach(function (field) {
+    //             result[field] += curr[field];
+    //           });
+    //           aggr.min.forEach(function (field) {
+    //             //JS always returns false for (a < b) when b is NaN.
+    //             if ((curr[field] < result[field]) || _.isNaN(result[field])) {
+    //               result[field] = curr[field];
+    //             }
+    //           });
+    //           aggr.max.forEach(function (field) {
+    //             //JS always returns false for (a > b) when b is NaN
+    //             if ((curr[field] > result[field]) || _.isNaN(result[field])) {
+    //               result[field] = curr[field];
+    //             }
+    //           });
+    //           for (var field in result.count) {
+    //             result[field] += curr[field];
+    //             result.count[field]++;
+    //           }
+    //         },
+    //         finalize: function (result) {
+    //           for (var field in result.count) {
+    //             result[field] /= result.count[field];
+    //           }
+    //           delete result.count;
+    //         }
+    //       };
 
-        //Init group.key
-        if (groupVars.has('groupBy')) {
-          group.key = {};
-          options.groupBy.forEach(function (key) {
-            group.key[key] = 1;
-          });
-        }
+    //     //Init group.key
+    //     if (groupVars.has('groupBy')) {
+    //       group.key = {};
+    //       options.groupBy.forEach(function (key) {
+    //         group.key[key] = 1;
+    //       });
+    //     }
 
-        //Init group.initial
-        groupVars.omit('groupBy').each(function (value, key) {
-          value.forEach(function (field) {
-            if (key === 'average') {
-              initial.count[field] = 0;
-              initial[field] = 0;
-            } else {
-              initial[field] = seed[key];
-              aggr[key].push(field);
-            }
-          });
-        });
-      }
-      if (options.sort) {
-        //TODO: Handle sort
-      }
-      if (options.skip) {
-        cursor.skip(options.skip);
-      }
-      if (options.limit) {
-        cursor.skip(options.limit);
-      }
+    //     //Init group.initial
+    //     groupVars.omit('groupBy').each(function (value, key) {
+    //       value.forEach(function (field) {
+    //         if (key === 'average') {
+    //           initial.count[field] = 0;
+    //           initial[field] = 0;
+    //         } else {
+    //           initial[field] = seed[key];
+    //           aggr[key].push(field);
+    //         }
+    //       });
+    //     });
+    //   }
+    //   if (options.sort) {
+    //     //TODO: Handle sort
+    //   }
+    //   if (options.skip) {
+    //     cursor.skip(options.skip);
+    //   }
+    //   if (options.limit) {
+    //     cursor.skip(options.limit);
+    //   }
 
-      cursor.exec(function (err, docs) {
-        cb(err, utils.rewriteIds(docs));
-      });
-    },
+    //   cursor.exec(function (err, docs) {
+    //     cb(err, utils.rewriteIds(docs));
+    //   });
+    // },
 
     /**
      *
@@ -276,15 +329,15 @@ module.exports = (function () {
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    create: function (collectionName, data, cb) {
-      delete data.id;
-      delete data._id;
+    // create: function (collectionName, data, cb) {
+    //   delete data.id;
+    //   delete data._id;
 
-      dbs[collectionName].insert(data, function (err, result) {
-        if (err) return cb(err);
-        cb(err, result);
-      });
-    },
+    //   dbs[collectionName].insert(data, function (err, result) {
+    //     if (err) return cb(err);
+    //     cb(err, result);
+    //   });
+    // },
 
     /**
      *
@@ -297,22 +350,22 @@ module.exports = (function () {
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    update: function (collectionName, options, values, cb) {
+    // update: function (collectionName, options, values, cb) {
 
-      // If you need to access your private data for this collection:
-      var collection = _modelReferences[collectionName];
+    //   // If you need to access your private data for this collection:
+    //   var collection = _modelReferences[collectionName];
 
-      // 1. Filter, paginate, and sort records from the datastore.
-      //    You should end up w/ an array of objects as a result.
-      //    If no matches were found, this will be an empty array.
-      //    
-      // 2. Update all result records with `values`.
-      // 
-      // (do both in a single query if you can-- it's faster)
+    //   // 1. Filter, paginate, and sort records from the datastore.
+    //   //    You should end up w/ an array of objects as a result.
+    //   //    If no matches were found, this will be an empty array.
+    //   //
+    //   // 2. Update all result records with `values`.
+    //   //
+    //   // (do both in a single query if you can-- it's faster)
 
-      // Respond with error or an array of updated records.
-      cb(null, []);
-    },
+    //   // Respond with error or an array of updated records.
+    //   cb(null, []);
+    // },
 
     /**
      *
@@ -323,22 +376,22 @@ module.exports = (function () {
      * @param  {Function} cb             [description]
      * @return {[type]}                  [description]
      */
-    destroy: function (collectionName, options, cb) {
+    // destroy: function (collectionName, options, cb) {
 
-      // If you need to access your private data for this collection:
-      var collection = _modelReferences[collectionName];
+    //   // If you need to access your private data for this collection:
+    //   var collection = _modelReferences[collectionName];
 
-      // 1. Filter, paginate, and sort records from the datastore.
-      //    You should end up w/ an array of objects as a result.
-      //    If no matches were found, this will be an empty array.
-      //    
-      // 2. Destroy all result records.
-      // 
-      // (do both in a single query if you can-- it's faster)
+    //   // 1. Filter, paginate, and sort records from the datastore.
+    //   //    You should end up w/ an array of objects as a result.
+    //   //    If no matches were found, this will be an empty array.
+    //   //
+    //   // 2. Destroy all result records.
+    //   //
+    //   // (do both in a single query if you can-- it's faster)
 
-      // Return an error, otherwise it's declared a success.
-      cb();
-    },
+    //   // Return an error, otherwise it's declared a success.
+    //   cb();
+    // },
 
     /*
         **********************************************
@@ -356,17 +409,17 @@ module.exports = (function () {
         findOrCreate: function (collectionName, arrayOfAttributeNamesWeCareAbout, newAttributesObj, cb) { cb(); },
       */
 
-    createEach: function (collectionName, data, cb) {
-      data.forEach(function (val) {
-        delete val.id;
-        delete val._id;
-      });
+    // createEach: function (collectionName, data, cb) {
+    //   data.forEach(function (val) {
+    //     delete val.id;
+    //     delete val._id;
+    //   });
 
-      dbs[collectionName].insert(data, function (err, result) {
-        if (err) return cb(err);
-        cb(err, result);
-      });
-    },
+    //   dbs[collectionName].insert(data, function (err, result) {
+    //     if (err) return cb(err);
+    //     cb(err, result);
+    //   });
+    // },
 
     /*
         **********************************************
@@ -436,11 +489,23 @@ module.exports = (function () {
         })
 
 
-        
+
 
     */
 
   };
+
+  /**
+   * Grab the connection object for a connection name
+   *
+   * @param {String} connectionName
+   * @return {Object}
+   * @api private
+   */
+
+  function grabConnection(connectionName) {
+    return connections[connectionName];
+  }
 
   // Expose adapter definition
   return adapter;
