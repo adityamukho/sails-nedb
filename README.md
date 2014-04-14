@@ -23,7 +23,7 @@ No special configuration is necessary.
 
 ## Acknowledgement
 
-A big thanks to the contributors of NeDB, sails-disk, and sails-mongo. sails-nedb owes it in no small amount to each of these projects for its existence :).
+A big thanks to the contributors of **NeDB**, **sails-disk**, and **sails-mongo**. **sails-nedb** owes it in no small amount to each of these projects for its existence :).
 
 ## About Sails.js
 http://sailsjs.com
