@@ -13,12 +13,9 @@
   },
   "keywords": [
     "nedb",
-    "adapter",
     "sails",
     "waterline",
-    "orm",
-    "sailsjs",
-    "sails.js"
+    "orm"
   ],
   "author": "Aditya Mukhopadhyay <webmaster@adityamukho.com>",
   "license": "MIT",
