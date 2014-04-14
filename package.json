@@ -32,10 +32,11 @@
     "waterline-errors": "^0.10.0-rc1"
   },
   "devDependencies": {
-    "waterline-adapter-tests": "git://github.com/balderdashy/waterline-adapter-tests.git#associations",
+    "waterline-adapter-tests": "~0.10.0",
     "mocha": "*",
     "root-require": "~0.2.0",
-    "captains-log": "~0.10.6"
+    "captains-log": "~0.10.6",
+    "rimraf": "^2.2.6"
   },
   "sailsAdapter": {
     "sailsVersion": "~0.10.0",
