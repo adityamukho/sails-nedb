@@ -1,6 +1,6 @@
 ![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png)
 
-# NEDB Adapter
+# NEDB Adapter [![Build Status](https://travis-ci.org/adityamukho/sails-nedb.svg?branch=master)](https://travis-ci.org/adityamukho/sails-nedb)
 
 Waterline adapter for NeDB.
 
