@@ -2,7 +2,7 @@
   "name": "sails-nedb",
   "version": "0.10.0",
   "description": "NeDB adapter for Sails / Waterline",
-  "main": "index.js",
+  "main": "./lib/adapter.js",
   "scripts": {
     "test": "node test/integration/runner -R spec -b",
     "prepublish": "npm prune"

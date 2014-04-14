@@ -8,3 +8,4 @@ ssl
 nbproject
 npm-debug.log
 *.sublime-*
+.tmp
