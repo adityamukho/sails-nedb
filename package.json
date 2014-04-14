@@ -1,6 +1,6 @@
 {
   "name": "sails-nedb",
-  "version": "0.10.0",
+  "version": "0.10.0-alpha",
   "description": "NeDB adapter for Sails / Waterline - 0.10.x",
   "main": "./lib/adapter.js",
   "scripts": {
@@ -26,20 +26,21 @@
     "lodash": "^2.4.1",
     "base-framework": "^1.0.1",
     "mkdirp": "^0.3.5",
-    "waterline-errors": "^0.10.0-rc1"
+    "waterline-errors": "^0.10.0-rc1",
+    "rimraf": "^2.2.6"
   },
   "devDependencies": {
     "waterline-adapter-tests": "~0.10.0",
     "mocha": "*",
     "root-require": "~0.2.0",
-    "captains-log": "~0.10.6",
-    "rimraf": "^2.2.6"
+    "captains-log": "~0.10.6"
   },
   "sailsAdapter": {
     "sailsVersion": "~0.10.0",
     "implements": [
       "semantic",
-      "queryable"
+      "queryable",
+      "associations"
     ]
   }
 }
