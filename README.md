@@ -1,12 +1,29 @@
 ![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png)
 
-# sails-nedb
+# NEDB Adapter
 
-For Sails 0.10
-
-**UNDER CONSTRUCTION**
+Waterline adapter for NeDB.
 
 A persistent object store which uses [Node Embedded Database](https://github.com/louischatriot/nedb) as the storage engine.
+
+## Installation
+
+Install from NPM.
+
+```bash
+$ npm install sails-nedb --save
+```
+
+The NeDB dependency is actually pulled from my forked repo of the original, because I needed to add aggregation support at the DB layer.
+
+## Sails Configuration
+
+Add the nedb config to the `config/connections.js` file.
+No special configuration is necessary.
+
+## Acknowledgement
+
+A big thanks to the contributors of NeDB, sails-disk, and sails-mongo. sails-nedb owes it in no small amount to each of these projects for its existence :).
 
 ## About Sails.js
 http://sailsjs.com
