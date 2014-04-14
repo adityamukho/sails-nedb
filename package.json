@@ -41,8 +41,7 @@
     "sailsVersion": "~0.10.0",
     "implements": [
       "semantic",
-      "queryable",
-      "associations"
+      "queryable"
     ]
   }
 }
