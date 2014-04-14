@@ -1,8 +1,10 @@
-![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png) 
+![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png)
 
 # sails-nedb
 
-Tested with Sails 0.10
+For Sails 0.10
+
+**UNDER CONSTRUCTION**
 
 A persistent object store which uses [Node Embedded Database](https://github.com/louischatriot/nedb) as the storage engine.
 
