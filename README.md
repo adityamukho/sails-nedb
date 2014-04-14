@@ -14,7 +14,7 @@ Install from NPM.
 $ npm install sails-nedb --save
 ```
 
-The NeDB dependency is actually pulled from my forked repo of the original, because I needed to add aggregation support at the DB layer. If and when the [pull request](https://github.com/louischatriot/nedb/pull/153) gets merged into the main line, the dependendency can be switched back to the npm module.
+The NeDB dependency is actually pulled from my forked repo of the original, because I needed to add aggregation support at the DB layer. If and when [this pull request](https://github.com/louischatriot/nedb/pull/153) gets merged into the main line, the dependendency can be switched back to the npm module.
 
 ## Sails Configuration
 
