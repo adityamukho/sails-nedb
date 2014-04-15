@@ -15,7 +15,8 @@
     "nedb",
     "sails",
     "waterline",
-    "orm"
+    "orm",
+    "adapter"
   ],
   "author": "Aditya Mukhopadhyay <webmaster@adityamukho.com>",
   "license": "MIT",

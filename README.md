@@ -1,6 +1,6 @@
 ![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png)
 
-# NEDB Adapter [![Build Status](https://travis-ci.org/adityamukho/sails-nedb.svg?branch=master)](https://travis-ci.org/adityamukho/sails-nedb)
+# NeDB Adapter [![Build Status](https://travis-ci.org/adityamukho/sails-nedb.svg?branch=master)](https://travis-ci.org/adityamukho/sails-nedb)
 
 Waterline adapter for NeDB.
 
@@ -14,16 +14,16 @@ Install from NPM.
 $ npm install sails-nedb --save
 ```
 
-The NeDB dependency is actually pulled from my forked repo of the original, because I needed to add aggregation support at the DB layer. If and when [this pull request](https://github.com/louischatriot/nedb/pull/153) gets merged into the main line, the dependendency can be switched back to the npm module.
+The NeDB dependency is actually pulled from my forked repo of the original, because I needed to add aggregation support at the DB layer. If and when [this pull request](https://github.com/louischatriot/nedb/pull/153) gets merged into the main line, the dependendency will be switched back to the npm module.
 
 ## Sails Configuration
 
 Add the nedb config to the `config/connections.js` file.
-No special configuration is necessary.
+No special configuration is necessary. One can optionally set the `filePath` to point to a particular location. Files get saved to `.tmp` inside the application root by default.
 
 ## Acknowledgement
 
-A big thanks to the contributors of **NeDB**, **sails-disk**, and **sails-mongo**. **sails-nedb** owes it in no small amount to each of these projects for its existence :).
+A big thanks to the contributors of **NeDB**, **sails-disk**, and **sails-mongo**. This adapter owes its existence in no small amount to each of these projects :).
 
 ## About Sails.js
 http://sailsjs.com
