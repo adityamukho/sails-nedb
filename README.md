@@ -8,12 +8,7 @@ A persistent object store which uses [Node Embedded Database](https://github.com
 
 ## Caution
 
-1. In case you run multiple sails workers on a machine as part of a load balancing strategy: NeDB is not designed to synchronize file writes across multiple concurrent processes. Running sails with more than 1 worker **WILL** eventually lead to inconsistent, and very likely corrupted data.
-1. Updates are not atomic at the moment. Currently, an update actually happens in 3 stages:
-    * A `find` query to return all documents matching update criteria. The ids of all returned documents are stored in a temporary array.
-    * An `update` query, run with the provided criteria. NeDB currently does not return a list of the updated documents in this query - just the number of doc updated. (**Note:** this is NOT an upsert.)
-    * A second `find` query, using the temp array of ids to return the list of modified documents.
-Since the three separate queries are not part of a transaction, other queries could have been run in the meantime, altering the documents involved. For example, the set of docs returned by the first `find` and the set of docs actually modified by the `update` could be different because of an intervening `insert` or `remove` query.
+In case you run multiple sails workers on a machine as part of a load balancing strategy: NeDB is not designed to synchronize file writes across multiple concurrent processes. Running sails with more than 1 worker **WILL** eventually lead to inconsistent, and very likely corrupted data.
 
 ## Installation
 
