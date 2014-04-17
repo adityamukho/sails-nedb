@@ -10,9 +10,9 @@ A persistent object store which uses [Node Embedded Database](https://github.com
 
 1. Sails 0.10.x is inherently capable of running in _clustered_ mode wherein it forks into separate processes that let it utilize multiple cores on a system. NeDB is not designed to synchronize file writes across multiple concurrent processes. Running sails with more than 1 worker **WILL** eventually lead to inconsistent, and very likely corrupted data.
 1. Updates are not atomic at the moment. Currently, an update actually happens in 3 stages:
-  1.1 A `find` query to return all documents matching update criteria. The ids of all returned documents are stored in a temporary array.
-  1.1 An `update` query, run with the provided criteria. NeDB currently does not return a list of the updated documents in this query - just the number of doc updated. (**Note:** this is NOT an upsert.)
-  1.1 A second `find` query, using the temp array of ids to return the list of modified documents.
+    * A `find` query to return all documents matching update criteria. The ids of all returned documents are stored in a temporary array.
+    * An `update` query, run with the provided criteria. NeDB currently does not return a list of the updated documents in this query - just the number of doc updated. (**Note:** this is NOT an upsert.)
+    * A second `find` query, using the temp array of ids to return the list of modified documents.
 Since the three separate queries are not part of a transaction, other queries could have been run in the meantime, altering the documents involved. For example, the number of docs returned by the first `find` and the number of docs actually modified by the `update` could be different because of an intervening `insert` or `remove` query.
 
 ## Installation
