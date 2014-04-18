@@ -10,7 +10,7 @@ A persistent object store which uses [Node Embedded Database](https://github.com
 
 ## Caution
 
-In case you run multiple sails workers on a machine as part of a load balancing strategy: NeDB is not designed to synchronize file writes across multiple concurrent processes. Running sails with more than 1 worker **WILL** eventually lead to inconsistent, and very likely corrupted data.
+In case you run multiple sails workers on a machine as part of a load balancing strategy: NeDB is not designed to synchronize file writes across multiple concurrent processes. Running an NeDB-backed sails app with more than 1 worker **WILL** eventually lead to inconsistent, and very likely corrupted data.
 
 ## Installation
 
