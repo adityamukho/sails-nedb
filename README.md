@@ -1,6 +1,6 @@
 ![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png)
 
-# NeDB Adapter [![Build Status](https://travis-ci.org/adityamukho/sails-nedb.svg?branch=master)](https://travis-ci.org/adityamukho/sails-nedb) [![Code Climate](https://codeclimate.com/github/adityamukho/sails-nedb.png)](https://codeclimate.com/github/adityamukho/sails-nedb)
+# NeDB Adapter [![Build Status](https://travis-ci.org/adityamukho/sails-nedb.svg?branch=master)](https://travis-ci.org/adityamukho/sails-nedb)
 
 [![Npm Downloads](https://nodei.co/npm/sails-nedb.png?downloads=true&stars=true)](https://www.npmjs.org/package/sails-nedb)
 
