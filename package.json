@@ -22,7 +22,7 @@
   "license": "MIT",
   "readmeFilename": "README.md",
   "dependencies": {
-    "nedb": "https://github.com/adityamukho/nedb/tarball/v0.10.5g-1",
+    "nedb": "https://github.com/adityamukho/nedb/tarball/v0.11.1g",
     "async": "^0.2.10",
     "lodash": "^2.4.1",
     "base-framework": "^1.0.1",
@@ -40,8 +40,7 @@
     "sailsVersion": "~0.10.0",
     "implements": [
       "semantic",
-      "queryable",
-      "associations"
+      "queryable"
     ]
   }
 }
